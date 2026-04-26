@@ -27,9 +27,9 @@ function Write-Utf8File {
 
 function Get-UsablePythonCommand {
     $candidates = @(
-        @{ Name = "py"; VersionArgs = @("--version"); PrefixArgs = @("-3"); DisplayName = "py -3" },
         @{ Name = "python"; VersionArgs = @("--version"); PrefixArgs = @(); DisplayName = "python" },
-        @{ Name = "python3"; VersionArgs = @("--version"); PrefixArgs = @(); DisplayName = "python3" }
+        @{ Name = "python3"; VersionArgs = @("--version"); PrefixArgs = @(); DisplayName = "python3" },
+        @{ Name = "py"; VersionArgs = @("--version"); PrefixArgs = @("-3"); DisplayName = "py -3" }
     )
     foreach ($candidate in $candidates) {
         $command = Get-Command $candidate.Name -ErrorAction SilentlyContinue
