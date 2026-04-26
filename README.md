@@ -3,8 +3,21 @@
 [![Latest Release](https://img.shields.io/github/v/release/Benboerba620/pod2wiki?display_name=tag)](https://github.com/Benboerba620/pod2wiki/releases/latest)
 [![Podcast Lint](https://github.com/Benboerba620/pod2wiki/actions/workflows/podcast-lint.yml/badge.svg)](https://github.com/Benboerba620/pod2wiki/actions/workflows/podcast-lint.yml)
 
-> **"零代码 AI 投研四件套" 之一** | Part of the zero-code AI investment research toolkit
-> 知识库底座 [karpathy-claude-wiki](https://github.com/Benboerba620/karpathy-claude-wiki) · 每日盯盘 [daily-watchlist](https://github.com/Benboerba620/daily-watchlist) · 假设追踪 [hypothesis-tracker](https://github.com/Benboerba620/hypothesis-tracker) · 播客/长文输入端 pod2wiki
+> 🎙️ **30 秒看懂 / In 30 seconds**：把高质量播客（YouTube/RSS）和长文 RSS 自动转成中文摘要 + 英文原文存档，写进你的个人 LLM 知识库。Whisper 转录 + DeepSeek 翻译，一键 AI 安装。
+> Turn high-signal podcasts and long-form RSS into Chinese summaries plus archived English transcripts, written into your personal LLM wiki. Whisper + DeepSeek, one-line AI install.
+
+> 🔗 **零代码 AI 投研四件套** ｜ Zero-code AI investment research toolkit
+> **🎙️ pod2wiki 输入** · 🧠 [karpathy-claude-wiki](https://github.com/Benboerba620/karpathy-claude-wiki) 底座 · 📊 [daily-watchlist](https://github.com/Benboerba620/daily-watchlist) 日常 · 🎯 [hypothesis-tracker](https://github.com/Benboerba620/hypothesis-tracker) 决策
+
+```mermaid
+flowchart LR
+    P[🎙️ pod2wiki] -->|sources| W[🧠 karpathy-claude-wiki]
+    W -.->|read| D[📊 daily-watchlist]
+    W -.->|read| H[🎯 hypothesis-tracker]
+    D --> H
+    H -.->|evidence| W
+    style P fill:#c7d2fe,stroke:#3730a3
+```
 
 ---
 
