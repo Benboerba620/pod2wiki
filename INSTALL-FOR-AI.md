@@ -1,0 +1,73 @@
+# INSTALL-FOR-AI.md
+
+This file is for AI agents installing pod2wiki for a non-technical user.
+Default flow: AI agent does everything via the one-click installer. The user only answers two questions and pastes one API key.
+
+## Phase 1. Check Environment
+
+```bash
+python --version
+git --version
+```
+
+Both required. If missing, tell the user to install Python 3.11+ and git.
+
+## Phase 2. Clone The Repo
+
+```bash
+git clone https://github.com/Benboerba620/pod2wiki.git
+cd pod2wiki
+```
+
+Do not create commits or push.
+
+## Phase 3. Ask Two Questions
+
+Ask one at a time:
+
+1. **Where should pod2wiki output go?**
+   - If the user already has a `karpathy-claude-wiki` repo: ask for the path to its `wiki/sources` folder.
+   - If not: tell them you will create a fresh `wiki/sources/` next to the install (they can move it later).
+2. **Which LLM provider do you want to use?**
+   - Default: `deepseek` (cheapest, best EN→ZH summarization quality).
+   - Other options: `kimi`, `glm` (free tier), `qwen`, `openai`.
+   - Once they pick, ask for the API key.
+
+## Phase 4. Run The Installer
+
+Pick the script for the user's OS.
+
+**Windows:**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/install.ps1 -TargetDir <workspace-path> -WikiSourcesPath <wiki-sources-path-or-omit>
+```
+
+**macOS/Linux:**
+```bash
+bash scripts/install.sh --target-dir <workspace-path> --wiki-sources-path <wiki-sources-path-or-omit>
+```
+
+`--wiki-sources-path` is optional. Omit it to let the installer create `<workspace>/wiki/sources` from scratch.
+
+The installer:
+- copies pod2wiki to `<workspace>/tools/pod2wiki/`
+- writes `<workspace>/config/pod2wiki.config.yaml` (defaults to the AI investing 10-source starter pack)
+- writes `<workspace>/config/pod2wiki.env`
+- writes `<workspace>/.claude/commands/pod2wiki.md` (the `/pod2wiki` slash command)
+- writes `<workspace>/.claude/skills/pod2wiki/SKILL.md`
+- runs `pip install -r requirements.txt`
+- runs a dry-run smoke test
+
+## Phase 5. Fill In The LLM Key
+
+Open `<workspace>/config/pod2wiki.env` and replace `LLM_API_KEY=sk-xxx` with the key the user gave you in Phase 3. If they picked a non-default provider, also uncomment that provider's block and comment out the deepseek one.
+
+## Phase 6. Confirm
+
+Tell the user:
+
+- pod2wiki is installed at `<workspace>/tools/pod2wiki/`
+- they can now type `/pod2wiki` in Claude Code, or say "scan podcasts" / "刷一下播客"
+- the default config tracks 10 high-signal AI sources; they can edit `config/pod2wiki.config.yaml` to add more channels, blogs, hypotheses, or change the theme
+
+That's it. Do not run a real scan unless the user asks — first runs cost LLM tokens.

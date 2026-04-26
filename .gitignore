@@ -1,0 +1,13 @@
+.env
+config.yaml
+output/*
+!output/.gitkeep
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.DS_Store
+.idea/
+.vscode/
+*.log
