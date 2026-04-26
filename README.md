@@ -121,14 +121,16 @@ mp3 / 视频字幕 / RSS 全文
    v  Whisper transcribe（mp3）或 直接拿（字幕 / RSS 全文）
 英文全文  ----->  wiki/raw/podcasts/        (永久归档，二次复用)
    |
-   v  DeepSeek (or Kimi/GLM/Qwen/OpenAI) 摘要 + 翻译
+   v  DeepSeek V4 Flash 摘要 + 翻译（默认；可换 Kimi/GLM/Qwen/OpenAI）
 中文 source-summary  ----->  wiki/sources/  (karpathy-claude-wiki 兼容)
    |
    v  insight log 汇总
 output/pod2wiki/{theme}-insights-log.md     (本次扫描的主线整理)
 ```
 
-LLM 提供商在 `config/pod2wiki.env` 里切（DeepSeek / Kimi / GLM / Qwen / OpenAI 任选其一，OpenAI 兼容协议）。
+> 💡 **关于 Whisper 触发条件**：只在 RSS description 短于 1500 字符（默认 `whisper.auto_threshold`）且有音频链接时才下 mp3 跑 Whisper。Substack 这类自带完整 show notes 的频道（描述往往几万字符）会**跳过** Whisper 直接用 description——更省钱、更准、信息量更大。要强制走 Whisper 加 `--whisper-threshold 999999`；要完全关掉加 `--no-whisper`。
+
+LLM 提供商在 `config/pod2wiki.env` 里切。**默认 DeepSeek V4 Flash**——英→中摘要性价比最高；要换 Kimi / GLM / Qwen / OpenAI，把对应段落取消注释即可（全部 OpenAI 兼容协议）。
 
 ## 不包含什么
 
@@ -256,14 +258,16 @@ mp3 / video subtitles / RSS full text
    v  Whisper transcribe (mp3) or direct (subtitles / RSS)
 English full text  ----->  wiki/raw/podcasts/    (permanent archive, reusable)
    |
-   v  DeepSeek (or Kimi/GLM/Qwen/OpenAI) summarize + translate
+   v  DeepSeek V4 Flash summarize + translate (default; swap for Kimi/GLM/Qwen/OpenAI)
 Chinese source-summary  ----->  wiki/sources/    (karpathy-claude-wiki compatible)
    |
    v  insight log roll-up
 output/pod2wiki/{theme}-insights-log.md          (this scan's narrative thread)
 ```
 
-LLM provider is set in `config/pod2wiki.env` (DeepSeek / Kimi / GLM / Qwen / OpenAI — any OpenAI-compatible endpoint).
+> 💡 **About the Whisper trigger**: mp3 download + Whisper only fire when an RSS item's `<description>` is shorter than 1500 chars (default `whisper.auto_threshold`) **and** an audio enclosure exists. Substack-style feeds that ship full show notes (often tens of thousands of chars) **skip** Whisper and use the description directly — cheaper, more accurate, more context. Force Whisper with `--whisper-threshold 999999`, disable it entirely with `--no-whisper`.
+
+LLM provider is set in `config/pod2wiki.env`. **Default is DeepSeek V4 Flash** — best price/quality for EN→ZH podcast summarization. To switch to Kimi / GLM / Qwen / OpenAI, uncomment the matching block (all are OpenAI-compatible endpoints).
 
 ## What this is not
 
