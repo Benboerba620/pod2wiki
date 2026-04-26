@@ -3,6 +3,17 @@ days_lookback: 7
 max_videos_per_channel: 5
 max_transcript_chars: 15000
 
+# Whisper auto-transcription for RSS podcast MP3s.
+# When an RSS <description> is shorter than auto_threshold chars and the item
+# has an enclosure URL, fetch_podcasts.py downloads the audio and runs
+# faster-whisper on it (CLI flags --whisper-model / --whisper-clip-seconds /
+# --no-whisper / --whisper-threshold override these).
+whisper:
+  enabled: true              # set false to skip transcription, use RSS description
+  model: tiny                # tiny | base | small | medium | large-v3
+  clip_seconds: 600          # transcribe first N seconds; null = whole episode
+  auto_threshold: 1500       # auto-transcribe if RSS description shorter than this
+
 llm:
   provider: deepseek
   model: deepseek-chat

@@ -292,7 +292,110 @@ def save_history(path: Path, history: dict[str, str]) -> None:
     path.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def rss_items(feed: dict[str, Any], days: int) -> list[dict[str, Any]]:
+def _whisper_settings(config: dict[str, Any]) -> dict[str, Any]:
+    raw = config.get("whisper") or {}
+    if not isinstance(raw, dict):
+        raw = {}
+    return {
+        "enabled": bool(raw.get("enabled", True)),
+        "model": str(raw.get("model") or "tiny"),
+        "clip_seconds": raw.get("clip_seconds", 600),
+        "auto_threshold": int(raw.get("auto_threshold") or 1500),
+    }
+
+
+def _download_audio(url: str, dest: Path) -> Path:
+    if dest.is_file() and dest.stat().st_size > 0:
+        eprint(f"[whisper] reuse cached audio {dest} ({dest.stat().st_size / 1024 / 1024:.1f}MB)")
+        return dest
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    eprint(f"[whisper] downloading {url} -> {dest}")
+    started = time.time()
+    bytes_written = 0
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    with requests.get(url, stream=True, timeout=60, headers={"User-Agent": UA}, proxies=requests_proxy()) as response:
+        response.raise_for_status()
+        with tmp.open("wb") as fh:
+            for chunk in response.iter_content(chunk_size=1024 * 256):
+                if chunk:
+                    fh.write(chunk)
+                    bytes_written += len(chunk)
+    tmp.replace(dest)
+    eprint(f"[whisper] downloaded {bytes_written / 1024 / 1024:.1f}MB in {time.time() - started:.1f}s")
+    return dest
+
+
+def _clip_audio(src: Path, seconds: int) -> Path:
+    clip = src.with_suffix(f".clip{seconds}.mp3")
+    if clip.is_file() and clip.stat().st_size > 0:
+        eprint(f"[whisper] reuse cached clip {clip}")
+        return clip
+    cmd = ["ffmpeg", "-y", "-loglevel", "error", "-i", str(src), "-t", str(int(seconds)), "-c", "copy", str(clip)]
+    try:
+        subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        eprint(f"[whisper] ffmpeg clip failed ({exc}); transcribing full audio")
+        return src
+    eprint(f"[whisper] clipped first {seconds}s -> {clip}")
+    return clip
+
+
+def maybe_transcribe(item: dict[str, Any], whisper_cfg: dict[str, Any], transcripts_dir: Path) -> None:
+    audio_url = item.get("audio_url") or ""
+    if not audio_url:
+        return
+    if not whisper_cfg.get("enabled", True):
+        return
+    description = item.get("raw_text") or ""
+    threshold = int(whisper_cfg.get("auto_threshold") or 1500)
+    if len(description) >= threshold:
+        return
+    try:
+        from podcast_rss_transcribe import transcribe_audio
+    except ImportError as exc:
+        eprint(f"[whisper] transcription unavailable ({exc}); falling back to RSS description")
+        return
+
+    stem = f"{item.get('date')}-{slugify(item.get('channel') or 'podcast')}-{slugify(item.get('title') or 'episode')}"
+    audio_ext = Path(audio_url.split("?", 1)[0]).suffix.lower() or ".mp3"
+    if audio_ext not in {".mp3", ".m4a", ".aac", ".ogg", ".wav"}:
+        audio_ext = ".mp3"
+    audio_path = transcripts_dir / f"{stem}{audio_ext}"
+    try:
+        audio_path = _download_audio(audio_url, audio_path)
+    except Exception as exc:
+        eprint(f"[whisper] download failed for {audio_url}: {exc}; falling back to RSS description")
+        return
+
+    target = audio_path
+    clip_seconds = whisper_cfg.get("clip_seconds")
+    if clip_seconds:
+        try:
+            target = _clip_audio(audio_path, int(clip_seconds))
+        except Exception as exc:
+            eprint(f"[whisper] clip failed: {exc}; transcribing full audio")
+            target = audio_path
+
+    model_name = str(whisper_cfg.get("model") or "tiny")
+    eprint(f"[whisper] transcribing {target.name} with {model_name} model...")
+    started = time.time()
+    try:
+        transcript = transcribe_audio(target, model_name=model_name)
+    except Exception as exc:
+        eprint(f"[whisper] transcription failed: {exc}; falling back to RSS description")
+        return
+    elapsed = time.time() - started
+    if not transcript or not transcript.strip():
+        eprint(f"[whisper] empty transcript after {elapsed:.1f}s; falling back to RSS description")
+        return
+    eprint(f"[whisper] done in {elapsed:.1f}s, {len(transcript)} chars")
+    item["raw_text"] = transcript
+    item["transcribed_by"] = f"faster-whisper-{model_name}"
+    item["transcript_clip_seconds"] = int(clip_seconds) if clip_seconds else None
+    item["transcript_audio_path"] = str(target)
+
+
+def rss_items(feed: dict[str, Any], days: int, whisper_cfg: dict[str, Any] | None = None, transcripts_dir: Path | None = None, max_items: int | None = None) -> list[dict[str, Any]]:
     url = feed.get("url") or feed.get("rss")
     if not url:
         return []
@@ -307,6 +410,8 @@ def rss_items(feed: dict[str, Any], days: int) -> list[dict[str, Any]]:
     channel_title = root.findtext("./channel/title") or feed.get("name") or "Unknown"
     out = []
     for item in root.findall("./channel/item"):
+        if max_items is not None and len(out) >= max_items:
+            break
         title = item.findtext("title") or "Untitled"
         published_raw = item.findtext("pubDate")
         published = parse_date(published_raw)
@@ -322,19 +427,20 @@ def rss_items(feed: dict[str, Any], days: int) -> list[dict[str, Any]]:
         )
         enclosure = item.find("enclosure")
         audio_url = enclosure.attrib.get("url") if enclosure is not None else ""
-        out.append(
-            {
-                "id": guid,
-                "title": strip_html(title),
-                "channel": feed.get("name") or channel_title,
-                "author": feed.get("author") or "",
-                "date": (published or datetime.now(timezone.utc)).date().isoformat(),
-                "url": link or audio_url or url,
-                "audio_url": audio_url,
-                "source_kind": "rss",
-                "raw_text": strip_html(description),
-            }
-        )
+        record = {
+            "id": guid,
+            "title": strip_html(title),
+            "channel": feed.get("name") or channel_title,
+            "author": feed.get("author") or "",
+            "date": (published or datetime.now(timezone.utc)).date().isoformat(),
+            "url": link or audio_url or url,
+            "audio_url": audio_url,
+            "source_kind": "rss",
+            "raw_text": strip_html(description),
+        }
+        if whisper_cfg and transcripts_dir is not None:
+            maybe_transcribe(record, whisper_cfg, transcripts_dir)
+        out.append(record)
     return out
 
 
@@ -352,7 +458,7 @@ def planned_inputs(config: dict[str, Any]) -> dict[str, int]:
     }
 
 
-def collect_rss(config: dict[str, Any], days: int, history: dict[str, str]) -> list[dict[str, Any]]:
+def collect_rss(config: dict[str, Any], days: int, history: dict[str, str], whisper_cfg: dict[str, Any] | None = None, transcripts_dir: Path | None = None, max_items_per_feed: int | None = None) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     feeds: list[dict[str, Any]] = []
     for channel in config.get("channels") or []:
@@ -361,7 +467,7 @@ def collect_rss(config: dict[str, Any], days: int, history: dict[str, str]) -> l
     feeds.extend(config.get("blog_feeds") or [])
     for feed in feeds:
         try:
-            for item in rss_items(feed, days):
+            for item in rss_items(feed, days, whisper_cfg=whisper_cfg, transcripts_dir=transcripts_dir, max_items=max_items_per_feed):
                 key = item["id"]
                 if key not in history:
                     items.append(item)
@@ -463,10 +569,13 @@ def collect(
     transcript_sleep: float,
     youtube_urls: list[str],
     youtube_queries: list[str],
+    whisper_cfg: dict[str, Any] | None = None,
+    transcripts_dir: Path | None = None,
+    max_items_per_feed: int | None = None,
 ) -> list[dict[str, Any]]:
     items: list[dict[str, Any]] = []
     if mode in {"all", "rss"}:
-        items.extend(collect_rss(config, days, history))
+        items.extend(collect_rss(config, days, history, whisper_cfg=whisper_cfg, transcripts_dir=transcripts_dir, max_items_per_feed=max_items_per_feed))
     if mode in {"all", "youtube"}:
         items.extend(
             collect_youtube(
@@ -684,12 +793,16 @@ def write_raw(item: dict[str, Any], base: Path) -> Path:
     raw_dir.mkdir(parents=True, exist_ok=True)
     filename = f"{item['date']}-{slugify(item['channel'])}-{slugify(item['title'])}.md"
     path = raw_dir / filename
+    transcribed_by = item.get("transcribed_by")
+    transcribed_line = f"transcribed_by: {transcribed_by}\n" if transcribed_by else ""
+    clip_secs = item.get("transcript_clip_seconds")
+    clip_line = f"transcript_clip_seconds: {clip_secs}\n" if clip_secs else ""
     body = f"""---
 title: {json.dumps(item['title'], ensure_ascii=False)}
 type: raw-transcript
 source: {json.dumps(item.get('url') or '', ensure_ascii=False)}
 created: {item['date']}
----
+{transcribed_line}{clip_line}---
 
 # {item['title']}
 
@@ -749,6 +862,8 @@ def write_source(item: dict[str, Any], structured: dict[str, Any], source_dir: P
     predictions = structured.get("predictions") or []
     quotes = structured.get("key_quotes") or structured.get("quotes") or []
     h_links = structured.get("h_links") or []
+    transcribed_by = item.get("transcribed_by")
+    transcribed_line = f"transcribed_by: {transcribed_by}\n" if transcribed_by else ""
     body = f"""---
 title: {json.dumps(item['title'], ensure_ascii=False)}
 type: source-summary
@@ -760,7 +875,7 @@ updated: {datetime.now().date().isoformat()}
 confidence: {structured.get('confidence') or 'medium'}
 speakers: {yaml_list(structured.get('speakers') or [])}
 language: {locale}
----
+{transcribed_line}---
 
 ## TL;DR / 一句话摘要
 
@@ -928,6 +1043,10 @@ def main() -> int:
     parser.add_argument("--transcript-backend", choices=["auto", "api", "yt-dlp"], default="auto")
     parser.add_argument("--transcript-languages", default="en,en-US,en-GB,zh-Hans,zh", help="Comma-separated subtitle language preference.")
     parser.add_argument("--transcript-sleep", type=float, default=1.5, help="Sleep seconds between transcript requests.")
+    parser.add_argument("--whisper-model", choices=["tiny", "base", "small", "medium", "large-v3"], help="Override whisper.model for podcast MP3 transcription.")
+    parser.add_argument("--whisper-clip-seconds", type=int, help="Override whisper.clip_seconds: transcribe only first N seconds (use 0 for full episode).")
+    parser.add_argument("--no-whisper", action="store_true", help="Disable Whisper transcription; use raw RSS description instead.")
+    parser.add_argument("--whisper-threshold", type=int, help="Override whisper.auto_threshold: auto-transcribe when RSS description shorter than N chars.")
     parser.add_argument("--translate-full", action="store_true", help="Translate full raw text/transcript with the configured LLM.")
     parser.add_argument("--translation-locale", default="zh-CN")
     parser.add_argument("--write-insight-log", action="store_true", help="Append a run-level insight report.")
@@ -962,6 +1081,18 @@ def main() -> int:
 
     history_path = OUTPUT / "seen_history.json"
     history = load_history(history_path)
+
+    whisper_cfg = _whisper_settings(config)
+    if args.no_whisper:
+        whisper_cfg["enabled"] = False
+    if args.whisper_model:
+        whisper_cfg["model"] = args.whisper_model
+    if args.whisper_clip_seconds is not None:
+        whisper_cfg["clip_seconds"] = args.whisper_clip_seconds if args.whisper_clip_seconds > 0 else None
+    if args.whisper_threshold is not None:
+        whisper_cfg["auto_threshold"] = args.whisper_threshold
+    transcripts_dir = OUTPUT / "transcripts"
+
     items = []
     for input_file in args.input_file:
         items.append(file_item(Path(input_file), args.title, args.channel, args.source_url, args.date))
@@ -978,6 +1109,9 @@ def main() -> int:
             args.transcript_sleep,
             args.youtube_url,
             args.youtube_query,
+            whisper_cfg=whisper_cfg,
+            transcripts_dir=transcripts_dir,
+            max_items_per_feed=args.max_items,
         )
     if args.max_items is not None:
         items = items[: args.max_items]

@@ -43,6 +43,16 @@ python tools/pod2wiki/scripts/fetch_podcasts.py \
   --write-insight-log
 ```
 
+When an RSS feed only ships a short `<description>` (Latent Space, many Substack
+podcasts), fetch_podcasts will automatically download the MP3 enclosure and run
+faster-whisper (`tiny` model, first 600s by default) to recover the spoken
+content. Override with `--whisper-model {tiny,base,small,medium,large-v3}`,
+`--whisper-clip-seconds N` (use 0 for full episode), `--whisper-threshold N`
+(auto-transcribe when description is shorter than N chars), or `--no-whisper`
+to disable. Audio is cached in `output/pod2wiki/transcripts/`. If
+`faster-whisper` is not installed, the run falls back to the RSS description
+and emits a `[whisper] transcription unavailable` warning to stderr.
+
 4. Parse stdout JSON and report to the user:
 
 - `items_found`
