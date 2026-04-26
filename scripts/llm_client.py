@@ -57,6 +57,29 @@ PROVIDERS: dict[str, dict[str, str]] = {
     },
 }
 
+PLACEHOLDER_VALUES = {
+    "",
+    "sk-xxx",
+    "xxx.xxx",
+    "your_api_key_here",
+    "your_deepseek_api_key_here",
+    "your_kimi_api_key_here",
+    "your_glm_api_key_here",
+    "your_qwen_api_key_here",
+    "your_openai_api_key_here",
+}
+
+
+def env_value(name: str) -> str | None:
+    """Return a real env value, ignoring documented placeholders."""
+    value = os.environ.get(name)
+    if value is None:
+        return None
+    cleaned = value.strip().strip("\"'")
+    if cleaned.lower() in PLACEHOLDER_VALUES:
+        return None
+    return cleaned
+
 
 def load_dotenv(path: Path | None = None) -> None:
     """Load a simple .env file without adding a dependency."""
@@ -78,11 +101,11 @@ def load_dotenv(path: Path | None = None) -> None:
 def resolve_provider(provider: str | None = None, model: str | None = None) -> dict[str, str]:
     """Resolve provider config from env vars."""
     load_dotenv()
-    name = provider or os.environ.get("LLM_PROVIDER") or "deepseek"
+    name = provider or env_value("LLM_PROVIDER") or "deepseek"
     if name not in PROVIDERS:
         raise LLMError(f"Unknown provider: {name}. Valid providers: {', '.join(PROVIDERS)}")
     cfg = PROVIDERS[name]
-    api_key = os.environ.get("LLM_API_KEY") or os.environ.get(cfg["key"])
+    api_key = env_value("LLM_API_KEY") or env_value(cfg["key"])
     if not api_key:
         raise LLMError(
             "Missing API key. Set LLM_API_KEY or the provider-specific key from .env.example."
@@ -90,8 +113,8 @@ def resolve_provider(provider: str | None = None, model: str | None = None) -> d
     return {
         "provider": name,
         "api_key": api_key,
-        "base_url": os.environ.get("LLM_BASE_URL") or os.environ.get(cfg["base"]) or cfg["base_default"],
-        "model": model or os.environ.get("LLM_MODEL") or os.environ.get(cfg["model"]) or cfg["model_default"],
+        "base_url": env_value("LLM_BASE_URL") or env_value(cfg["base"]) or cfg["base_default"],
+        "model": model or env_value("LLM_MODEL") or env_value(cfg["model"]) or cfg["model_default"],
     }
 
 

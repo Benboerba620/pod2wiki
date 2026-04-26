@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Ignore placeholder API key values such as `sk-xxx`, so provider-specific keys like `DEEPSEEK_API_KEY` still work in existing installs.
+- Document full-text translation output under `translations/` consistently.
+
 ## v0.1.0 - 2026-04-26
 
 Initial public draft for pod2wiki, extracted from a private podcast tracking workflow.
@@ -18,7 +25,7 @@ Initial public draft for pod2wiki, extracted from a private podcast tracking wor
 - Raw text archive under `raw/podcasts/`
 - Reversal-narrative red-flag detection
 - 30-day-style seen-history file for deduplication
-- AI and energy investing example configs
+- AI investing example config
 - Minimal GitHub Actions lint workflow
 
 ### Notes

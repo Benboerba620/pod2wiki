@@ -15,7 +15,7 @@ The one-click installer puts everything under the user's workspace:
 <workspace>/
 ├── tools/pod2wiki/scripts/fetch_podcasts.py
 ├── config/pod2wiki.config.yaml      # the one the user actually edits
-├── config/pod2wiki.env              # contains LLM_API_KEY
+├── config/pod2wiki.env              # contains LLM settings after the user fills the key
 ├── output/pod2wiki/                 # default local output if no wiki path
 └── wiki/sources/                    # if user supplied a wiki, this points there
 ```
@@ -48,6 +48,7 @@ python tools/pod2wiki/scripts/fetch_podcasts.py \
 - `items_found`
 - `source_pages_written`
 - `raw_pages_written`
+- `translation_pages_written`
 - `insight_log`
 - `verification_warnings`
 

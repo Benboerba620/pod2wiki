@@ -60,7 +60,20 @@ The installer:
 
 ## Phase 5. Fill In The LLM Key
 
-Open `<workspace>/config/pod2wiki.env` and replace `LLM_API_KEY=sk-xxx` with the key the user gave you in Phase 3. If they picked a non-default provider, also uncomment that provider's block and comment out the deepseek one.
+Open `<workspace>/config/pod2wiki.env` and uncomment the `LLM_API_KEY=...` line for the provider the user picked. Replace the placeholder value with the key from Phase 3.
+
+Default DeepSeek example:
+
+```text
+LLM_PROVIDER=deepseek
+LLM_API_KEY=<paste-user-key-here>
+LLM_BASE_URL=https://api.deepseek.com/v1
+LLM_MODEL=deepseek-chat
+```
+
+Do not leave placeholder values such as `sk-xxx`, `xxx.xxx`, or `your_deepseek_api_key_here`. pod2wiki ignores these placeholders and will treat them as missing keys.
+
+Full transcript translations written by `--translate-full` go to `<wiki-root>/translations/` and `<workspace>/output/pod2wiki/translations/`.
 
 ## Phase 6. Confirm
 
