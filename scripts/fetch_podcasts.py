@@ -1034,12 +1034,13 @@ def main() -> int:
     parser.add_argument("--source-url", help="Original URL override for a single --input-file run.")
     parser.add_argument("--date", help="YYYY-MM-DD override for local files.")
     parser.add_argument("--no-llm", action="store_true", help="Write an extractive low-confidence source page without calling an LLM.")
-    parser.add_argument("--max-items", type=int, help="Limit number of collected feed items to process.")
+    parser.add_argument("--max-items", type=int, help="Global limit on items to summarize/write after collection.")
+    parser.add_argument("--max-items-per-feed", type=int, help="Limit RSS/blog items collected from each feed. Defaults to config max_items_per_feed.")
     parser.add_argument("--mode", choices=["all", "rss", "youtube"], default="all", help="Discovery mode when --input-file is not used.")
     parser.add_argument("--youtube-mode", choices=["channels", "search", "urls", "all"], default="all", help="YouTube discovery mode.")
     parser.add_argument("--youtube-url", action="append", default=[], help="Explicit YouTube URL or video id. Can be passed multiple times.")
     parser.add_argument("--youtube-query", action="append", default=[], help="Explicit YouTube search query. Can be passed multiple times.")
-    parser.add_argument("--youtube-max-results", type=int, default=3, help="Max videos per channel/search query.")
+    parser.add_argument("--youtube-max-results", type=int, help="Max YouTube videos per channel/search query. Defaults to config max_videos_per_channel.")
     parser.add_argument("--transcript-backend", choices=["auto", "api", "yt-dlp"], default="auto")
     parser.add_argument("--transcript-languages", default="en,en-US,en-GB,zh-Hans,zh", help="Comma-separated subtitle language preference.")
     parser.add_argument("--transcript-sleep", type=float, default=1.5, help="Sleep seconds between transcript requests.")
@@ -1061,6 +1062,12 @@ def main() -> int:
         load_llm_dotenv(Path(args.env_file))
     config = load_config(config_path)
     days = 1 if args.days_quick else (args.days or int(config.get("days_lookback") or 7))
+    youtube_max_results = args.youtube_max_results
+    if youtube_max_results is None:
+        youtube_max_results = int(config.get("max_videos_per_channel") or 3)
+    max_items_per_feed = args.max_items_per_feed
+    if max_items_per_feed is None and config.get("max_items_per_feed") is not None:
+        max_items_per_feed = int(config.get("max_items_per_feed") or 0) or None
 
     if args.dry_run:
         payload = {
@@ -1072,6 +1079,9 @@ def main() -> int:
             "input_files": len(args.input_file),
             "discovery_mode": args.mode,
             "youtube_mode": args.youtube_mode,
+            "youtube_max_results": youtube_max_results,
+            "max_items": args.max_items,
+            "max_items_per_feed": max_items_per_feed,
             "wiki_out": args.wiki_out,
             "note": "dry-run validates config and does not call network, LLM, or write files",
         }
@@ -1103,7 +1113,7 @@ def main() -> int:
             history,
             args.mode,
             args.youtube_mode,
-            args.youtube_max_results,
+            youtube_max_results,
             args.transcript_backend,
             [part.strip() for part in args.transcript_languages.split(",") if part.strip()],
             args.transcript_sleep,
@@ -1111,7 +1121,7 @@ def main() -> int:
             args.youtube_query,
             whisper_cfg=whisper_cfg,
             transcripts_dir=transcripts_dir,
-            max_items_per_feed=args.max_items,
+            max_items_per_feed=max_items_per_feed,
         )
     if args.max_items is not None:
         items = items[: args.max_items]

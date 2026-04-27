@@ -1,5 +1,6 @@
 theme: ai-investing
 days_lookback: 7
+max_items_per_feed: 3
 max_videos_per_channel: 5
 max_transcript_chars: 15000
 

@@ -6,16 +6,15 @@
 > 🎙️ **30 秒看懂 / In 30 seconds**：把高质量播客（YouTube/RSS）和长文 RSS 自动转成中文摘要 + 英文原文存档，写进你的个人 LLM 知识库。Whisper 转录 + DeepSeek 翻译，一键 AI 安装。
 > Turn high-signal podcasts and long-form RSS into Chinese summaries plus archived English transcripts, written into your personal LLM wiki. Whisper + DeepSeek, one-line AI install.
 
-> 🔗 **零代码 AI 投研四件套** ｜ Zero-code AI investment research toolkit
-> **🎙️ pod2wiki 输入** · 🧠 [karpathy-claude-wiki](https://github.com/Benboerba620/karpathy-claude-wiki) 底座 · 📊 [daily-watchlist](https://github.com/Benboerba620/daily-watchlist) 日常 · 🎯 [hypothesis-tracker](https://github.com/Benboerba620/hypothesis-tracker) 决策
+> 🔗 **零代码 AI 投研三件套** ｜ Zero-code AI investment research toolkit
+> **🎙️ pod2wiki 输入** · 🧠 [karpathy-claude-wiki](https://github.com/Benboerba620/karpathy-claude-wiki) 底座 · 📊 [daily-watchlist](https://github.com/Benboerba620/daily-watchlist) 日常 + 内置假设追踪
 
 ```mermaid
 flowchart LR
     P[🎙️ pod2wiki] -->|sources| W[🧠 karpathy-claude-wiki]
     W -.->|read| D[📊 daily-watchlist]
-    W -.->|read| H[🎯 hypothesis-tracker]
-    D --> H
-    H -.->|evidence| W
+    D -->|hypotheses & trades| DHT[🎯 built-in HT]
+    DHT -.->|evidence| W
     style P fill:#c7d2fe,stroke:#3730a3
 ```
 
@@ -105,6 +104,16 @@ blog_feeds:
 > 不知道该追谁？看 `examples/config.ai-investing.yaml` 里默认追的 10 个 AI 信息源（Dwarkesh / Lex Fridman / Latent Space / Karpathy / Dylan Patel / Leopold / Doug O'Laughlin / Sam Altman / Jensen Huang / SemiAnalysis），照葫芦画瓢替换成你领域的对标人物即可。
 
 改完保存，下次跑 `/pod2wiki` 就按你的新配置抓。
+
+默认扫描窗口是最近 7 天，并限制每个 RSS/blog 来源最多处理 3 条：
+
+```yaml
+days_lookback: 7
+max_items_per_feed: 3
+max_videos_per_channel: 5
+```
+
+`max_items_per_feed` 是“每个 RSS/blog 来源最多处理几条”，不是全局上限；`max_videos_per_channel` 是 YouTube 每个频道/搜索词先看的候选数量，设成 5 是为了给无字幕、重复或不相关视频留一点缓冲。如果你只想控制整次运行的总处理量，再在命令里加 `--max-items 20` 这类全局安全阀。
 
 ## 抓完之后，文件去哪了？
 
@@ -242,6 +251,16 @@ blog_feeds:
 > No idea who to follow? Look at `examples/config.ai-investing.yaml` — the 10 default AI sources (Dwarkesh, Lex Fridman, Latent Space, Karpathy, Dylan Patel, Leopold, Doug O'Laughlin, Sam Altman, Jensen Huang, SemiAnalysis). Mirror that pattern and swap in the equivalents for your domain.
 
 Save the file. Next `/pod2wiki` run uses the new config.
+
+The default scan window is 7 days, with up to 3 items per RSS/blog source:
+
+```yaml
+days_lookback: 7
+max_items_per_feed: 3
+max_videos_per_channel: 5
+```
+
+`max_items_per_feed` limits each RSS/blog source, not the whole run. `max_videos_per_channel` is the candidate count checked per YouTube channel/search query; 5 leaves room for videos without subtitles, duplicates, or irrelevant hits. Use a command-line global cap such as `--max-items 20` if you also want a run-level safety limit.
 
 ## Where do my files go after a scan?
 
