@@ -31,10 +31,30 @@ ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = ROOT / "output"
 UA = "pod2wiki/0.1 (+https://github.com/Benboerba620/pod2wiki)"
 YOUTUBE_WATCH = "https://www.youtube.com/watch?v="
+YOUTUBE_RECOMMENDED_MAX_RESULTS = 5
+YOUTUBE_RECOMMENDED_TOTAL_CANDIDATES = 20
+YOUTUBE_RATE_LIMIT_HINT = (
+    "YouTube fetching is easy to rate-limit. Keep each run small (3-5 videos), "
+    "or use podcast RSS / downloaded transcripts / --input-file for bulk backfills."
+)
 
 
 def eprint(message: str) -> None:
     print(message, file=sys.stderr)
+
+
+def is_youtube_rate_limit_error(exc: Exception | str) -> bool:
+    message = str(exc).lower()
+    markers = [
+        "429",
+        "too many requests",
+        "toomanyrequests",
+        "rate limit",
+        "ratelimited",
+        "quota",
+        "temporarily blocked",
+    ]
+    return any(marker in message for marker in markers)
 
 
 def slugify(text: str, max_len: int = 80) -> str:
@@ -170,6 +190,8 @@ def ytdlp_video_metadata(url_or_id: str) -> dict[str, Any] | None:
         return parse_ytdlp_json_lines(output)[0]
     except Exception as exc:
         eprint(f"- YouTube URL skipped: {url_or_id} ({exc})")
+        if is_youtube_rate_limit_error(exc):
+            eprint(f"  hint: {YOUTUBE_RATE_LIMIT_HINT}")
         if video_id:
             return {"id": video_id, "title": video_id, "upload_date": "", "duration": None, "channel": "YouTube", "url": target}
     return None
@@ -227,6 +249,8 @@ def transcript_via_api(video_id: str, languages: list[str]) -> str | None:
         return " ".join(part.strip() for part in parts if part.strip())
     except Exception as exc:
         eprint(f"- transcript API failed for {video_id}: {str(exc)[:160]}")
+        if is_youtube_rate_limit_error(exc):
+            eprint(f"  hint: {YOUTUBE_RATE_LIMIT_HINT}")
         return None
 
 
@@ -253,6 +277,8 @@ def transcript_via_ytdlp(video_id: str, languages: list[str]) -> str | None:
             )
         except Exception as exc:
             eprint(f"- yt-dlp subtitles failed for {video_id}: {str(exc)[:160]}")
+            if is_youtube_rate_limit_error(exc):
+                eprint(f"  hint: {YOUTUBE_RATE_LIMIT_HINT}")
             return None
         candidates = sorted(Path(tmp).glob(f"{video_id}*.vtt"))
         for candidate in candidates:
@@ -490,6 +516,22 @@ def collect_youtube(
 ) -> list[dict[str, Any]]:
     videos: list[dict[str, Any]] = []
     channels = config.get("channels") or []
+    youtube_sources = 0
+    if youtube_mode in {"channels", "all"}:
+        youtube_sources += sum(1 for channel in channels if channel.get("youtube"))
+    if youtube_mode in {"search", "all"}:
+        queries = explicit_queries or (list(config.get("people_searches") or []) + list(config.get("exec_searches") or []))
+        youtube_sources += len(queries)
+    if youtube_mode in {"urls", "all"}:
+        youtube_sources += len(list(config.get("youtube_urls") or []) + explicit_urls)
+    if youtube_sources:
+        planned_candidates = youtube_sources * max_results
+        eprint(f"Note: {YOUTUBE_RATE_LIMIT_HINT}")
+        if max_results > YOUTUBE_RECOMMENDED_MAX_RESULTS or planned_candidates > YOUTUBE_RECOMMENDED_TOTAL_CANDIDATES:
+            eprint(
+                f"Warning: this run may check up to about {planned_candidates} YouTube candidates "
+                f"({youtube_sources} sources x {max_results}). For large backfills, prefer RSS or local transcripts."
+            )
     if youtube_mode in {"channels", "all"}:
         for channel in channels:
             if not channel.get("youtube"):
@@ -498,6 +540,8 @@ def collect_youtube(
                 videos.extend(get_channel_videos(channel["youtube"], channel.get("name") or "YouTube", max_results))
             except Exception as exc:
                 eprint(f"- YouTube channel skipped: {channel.get('name') or channel.get('youtube')} ({exc})")
+                if is_youtube_rate_limit_error(exc):
+                    eprint(f"  hint: {YOUTUBE_RATE_LIMIT_HINT}")
 
     if youtube_mode in {"search", "all"}:
         queries = explicit_queries or (list(config.get("people_searches") or []) + list(config.get("exec_searches") or []))
@@ -508,6 +552,8 @@ def collect_youtube(
                     videos.append(video)
             except Exception as exc:
                 eprint(f"- YouTube search skipped: {query} ({exc})")
+                if is_youtube_rate_limit_error(exc):
+                    eprint(f"  hint: {YOUTUBE_RATE_LIMIT_HINT}")
 
     if youtube_mode in {"urls", "all"}:
         url_values = list(config.get("youtube_urls") or []) + explicit_urls

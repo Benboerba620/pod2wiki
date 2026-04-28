@@ -2,10 +2,7 @@
 
 ## Unreleased
 
-### Fixed
-
-- Ignore placeholder API key values such as `sk-xxx`, so provider-specific keys like `DEEPSEEK_API_KEY` still work in existing installs.
-- Document full-text translation output under `translations/` consistently.
+- No unreleased changes.
 
 ## v0.1.0 - 2026-04-26
 
@@ -31,4 +28,10 @@ Initial public draft for pod2wiki, extracted from a private podcast tracking wor
 ### Notes
 
 - YouTube availability depends on the user's network and YouTube rate limits. RSS and local transcript input remain the most stable paths.
+- Runtime warnings now remind users to keep YouTube runs small and use RSS or local transcripts for large backfills.
 - MP3 transcription is optional through `scripts/podcast_rss_transcribe.py` and `faster-whisper`.
+
+### Fixed
+
+- Ignore placeholder API key values such as `sk-xxx`, so provider-specific keys like `DEEPSEEK_API_KEY` still work in existing installs.
+- Document full-text translation output under `translations/` consistently.

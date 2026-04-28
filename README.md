@@ -115,6 +115,8 @@ max_videos_per_channel: 5
 
 `max_items_per_feed` 是“每个 RSS/blog 来源最多处理几条”，不是全局上限；`max_videos_per_channel` 是 YouTube 每个频道/搜索词先看的候选数量，设成 5 是为了给无字幕、重复或不相关视频留一点缓冲。如果你只想控制整次运行的总处理量，再在命令里加 `--max-items 20` 这类全局安全阀。
 
+> ⚠️ **YouTube 不适合批量历史回填**：YouTube 搜索、字幕接口和 `yt-dlp` 都可能很快触发限流。建议每次只处理少量视频（3-5 条左右）。如果你要整理一个频道的大量历史内容，优先使用播客 RSS；如果没有 RSS，就先把音频/转录保存成本地文件，再用 `--input-file` 导入。遇到 `429` / `TooManyRequests` / rate limit 时，停止本轮 YouTube 抓取，隔一段时间再继续。
+
 ## 抓完之后，文件去哪了？
 
 每次 `/pod2wiki` 跑完，会在 wiki 目录下生成两份文件：
@@ -261,6 +263,8 @@ max_videos_per_channel: 5
 ```
 
 `max_items_per_feed` limits each RSS/blog source, not the whole run. `max_videos_per_channel` is the candidate count checked per YouTube channel/search query; 5 leaves room for videos without subtitles, duplicates, or irrelevant hits. Use a command-line global cap such as `--max-items 20` if you also want a run-level safety limit.
+
+> ⚠️ **YouTube is not the best path for bulk backfills**: YouTube search, transcript access, and `yt-dlp` can hit rate limits quickly. Keep each run small, roughly 3-5 videos. For a large channel backfill, prefer podcast RSS; if RSS is unavailable, save audio/transcripts locally first and import them with `--input-file`. If you see `429`, `TooManyRequests`, or rate-limit errors, stop the YouTube run and wait before trying again.
 
 ## Where do my files go after a scan?
 
