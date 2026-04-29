@@ -11,3 +11,5 @@ venv/
 .idea/
 .vscode/
 *.log
+*.baiduyun.uploading.cfg
+*.baiduyun.downloading.cfg

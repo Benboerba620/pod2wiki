@@ -19,6 +19,10 @@ jobs:
       - run: pip install pyyaml requests
       - name: Compile all scripts
         run: python -c "import pathlib, py_compile; [py_compile.compile(str(p), doraise=True) for p in pathlib.Path('scripts').glob('*.py')]"
+      - name: Public repo preflight
+        run: python scripts/preflight_public_repo.py
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p "test_*.py" -v
       - name: Verify placeholder API keys are ignored
         run: python -c "import os, sys; sys.path.insert(0, 'scripts'); os.environ['LLM_PROVIDER']='deepseek'; os.environ['LLM_API_KEY']='sk-xxx'; os.environ['DEEPSEEK_API_KEY']='provider-specific-test-key'; from llm_client import resolve_provider; assert resolve_provider()['api_key'] == 'provider-specific-test-key'"
       - name: Validate config schema
